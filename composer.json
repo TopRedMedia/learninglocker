@@ -27,21 +27,40 @@
   "keywords": ["lrs", "learninglocker"],
   "repositories": [
     {
+      "type": "pear",
+      "url": "http://pear.php.net"
+    },
+    {
       "type": "vcs",
-      "url": "git@github.com:LearningLocker/oauth2-server-laravel"
+      "url": "https://github.com/LearningLocker/laravel-mongodb"
     }
   ],
+  "config":{
+    "secure-http": false
+  },
   "require": {
-    "laravel/framework": "4.2.8",
-    "jenssegers/mongodb": "1.4.x",
+    "php": ">=5.5.0 <7.0",
+    "ext-mongo": "*",
+    "laravel/framework": "4.2.x",
+    "jenssegers/mongodb": "dev-issue/count-0.0.3",
     "davejamesmiller/laravel-breadcrumbs": "2.2.x",
     "way/generators": "2.6.x",
     "ramsey/array_column": "1.1.x",
     "barryvdh/laravel-cors": "0.2.x",
-    "lucadegasperi/oauth2-server-laravel": "1.0.x",
     "andywer/js-localization": "dev-laravel-4.2",
     "philo/laravel-translate": "1.0.x",
-    "learninglocker/statementfactory": "0.0.x"
+    "learninglocker/statementfactory": "0.0.x",
+    "seld/jsonlint": "^1.4",
+    "bshaffer/oauth2-server-php": "1.7.x",
+    "bshaffer/oauth2-server-httpfoundation-bridge": "1.1.x",
+    "jenssegers/mongodb-session": "~1.0",
+    "league/flysystem": "~1.0",
+    "league/flysystem-rackspace": "^1.0",
+    "league/flysystem-dropbox": "^1.0",
+    "league/flysystem-azure": "^1.0",
+    "league/flysystem-aws-s3-v3": "dev-master",
+    "itsgoingd/clockwork": "~1.10",
+    "php-amqplib/php-amqplib": "2.6.*"
   },
   "require-dev": {
     "phpunit/phpunit": "4.1.*"
@@ -60,20 +79,17 @@
       "app/locker/graphing",
       "app/locker/explorer",
       "app/locker/statements",
-      "app/locker/listeners"
+      "app/locker/listeners",
+      "app/locker/queues"
     ]
   },
   "scripts": {
     "post-install-cmd": [
-      "php artisan optimize",
-      "php artisan js-localization:refresh",
-      "cd public/assets/js && bower --allow-root update && cd ../../.."
+      "sh refresh.sh"
     ],
     "post-update-cmd": [
       "php artisan clear-compiled",
-      "php artisan optimize",
-      "php artisan js-localization:refresh",
-      "cd public/assets/js && bower --allow-root update && cd ../../.."
+      "sh refresh.sh"
     ],
     "post-create-project-cmd": [
       "php artisan key:generate"

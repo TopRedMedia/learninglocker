@@ -17,6 +17,23 @@ Event::listen('user.register', 'app\locker\listeners\RegisterHandler');
 
 Event::listen('user.email_resend', 'app\locker\listeners\RegisterHandler@resentEmailVerification');
 
-Event::listen('user.create_lrs', 'app\locker\listeners\LrsHandler');
+// Adds a Client for the LRS when the LRS is created.
+Event::listen('Lrs.store', function ($opts) {
+  $repo = new Locker\Repository\Client\EloquentRepository();
+  $repo->store([], ['lrs_id' => $opts['model']->_id]);
+});
 
-Event::listen('user.create_client', 'app\locker\listeners\ClientHandler');
+// Removes Clients for the LRS when the LRS is destroyed.
+Event::listen('Lrs.destroy', function ($opts) {
+  $repo = new Locker\Repository\Client\EloquentRepository();
+  $clients = $repo->index(['lrs_id' => $opts['id']]);
+  foreach ($clients as $client) {
+    $repo->destroy($client->_id, ['lrs_id' => $opts['id']]);
+  }
+});
+
+// Listeners for publishing to message queue system
+if (app\locker\listeners\MessageQueueHandler::enabled()) {
+  $app->instance('MessageQueueHandler', new app\locker\listeners\MessageQueueHandler);
+  Event::listen('statement.inserted', 'MessageQueueHandler@statementInserted');
+}

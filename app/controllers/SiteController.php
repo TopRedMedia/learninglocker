@@ -2,7 +2,7 @@
 
 use Locker\Repository\Site\SiteRepository as SiteRepo;
 use Locker\Repository\Lrs\Repository as LrsRepo;
-use Locker\Repository\Statement\StatementRepository as StatementRepo;
+use Locker\Repository\Statement\Repository as StatementRepo;
 use Locker\Repository\User\UserRepository as UserRepo;
 
 class SiteController extends BaseController {
@@ -20,7 +20,7 @@ class SiteController extends BaseController {
 
     $this->beforeFilter('auth');
     $this->beforeFilter('auth.super', array('except' => array('inviteUsers')));
-    $this->beforeFilter('csrf', array('only' => array('update', 'verifyUser', 'inviteUsers'))); 
+    $this->beforeFilter('csrf', array('only' => array('update', 'verifyUser', 'inviteUsers')));
   }
 
   /**
@@ -35,10 +35,10 @@ class SiteController extends BaseController {
     $admin_dashboard = new \app\locker\data\dashboards\AdminDashboard();
 
     return View::make('partials.site.dashboard', [
-      'site' => $site, 
+      'site' => $site,
       'list' => $list,
       'stats' => $admin_dashboard->getFullStats(),
-      'graph_data' => $admin_dashboard->getGraphData()
+      'dash_nav' => true
     ]);
 
   }
@@ -51,7 +51,7 @@ class SiteController extends BaseController {
   public function edit($id){
     $site = $this->site->find($id);
     return View::make('partials.site.edit', [
-      'site' => $site, 
+      'site' => $site,
       'settings_nav' => true
     ]);
   }
@@ -120,9 +120,12 @@ class SiteController extends BaseController {
   public function lrs(){
     $opts = ['user' => \Auth::user()];
     $lrss = $this->lrs->index($opts);
+    $lrs_repo = $this->lrs;
 
-    return Response::json(array_map(function ($lrs) {
-      $lrs->statement_total = $this->statement->count($lrs->_id);
+    $collection = \DB::getCollection('statements');
+
+    return Response::json(array_map(function ($lrs) use ($lrs_repo) {
+      $lrs->statement_total = $lrs_repo->getStatementCount($lrs->_id);
       return $lrs;
     }, $lrss));
   }
@@ -136,10 +139,11 @@ class SiteController extends BaseController {
    * @return Response
    */
   public function users() {
-    return Response::json(array_map(function ($user) {
+    return Response::json($this->user->all()->map(function ($user) {
       $user->lrs_owned  = $this->lrs->getLrsOwned($user->_id);
       $user->lrs_member = $this->lrs->getLrsMember($user->_id);
-    }, $this->user->all()));
+      return $user;
+    }));
   }
 
   /**
@@ -148,7 +152,7 @@ class SiteController extends BaseController {
    */
   public function inviteUsersForm() {
     return View::make('partials.site.invite', [
-      'users_nav' => true, 
+      'users_nav' => true,
       'admin_dash' => true
     ]);
   }
@@ -157,8 +161,13 @@ class SiteController extends BaseController {
    * Invite in the users
    **/
   public function inviteUsers() {
-    $invite = \Locker\Helpers\User::inviteUser(Input::all());
-    return Redirect::back()->with('success', trans('users.invite.invited'));
+    $tokens = \Locker\Helpers\User::inviteUser(Input::all());
+
+    return Redirect::back()->with('success', trans('users.invite.invited', [
+      'tokens' => array_reduce($tokens, function ($carry, $item) {
+        return $carry .= '</br>'.$item['email'].' must <a href="'.$item['url'].'">reset their password</a>.';
+      }, '')
+    ]));
   }
 
   /**

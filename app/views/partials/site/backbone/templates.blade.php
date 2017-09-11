@@ -14,10 +14,10 @@
   <td>
     <%= created_at %>
   </td>
-  <td>
+  <td class="text-center">
     <a href="{{ URL() }}/lrs/<%= _id %>/edit" class="btn btn-xs btn-success btn-space" title="{{ Lang::get('site.edit') }}"><i class="icon-pencil"></i></a>
   </td>
-  <td>
+  <td class="text-center">
     <button class="btn btn-danger btn-xs delete" title="{{ Lang::get('site.delete') }}"><i class="icon-trash"></i></button>
   </td>
 </script>
@@ -30,8 +30,8 @@
       <th>Statement #</th>
       <th>User #</th>
       <th>Created</th>
-      <th>Edit</th>
-      <th></th>
+      <th class="text-center">Edit</th>
+      <th class="text-center">Delete</th>
     </tr>
   </thead>
   <tbody></tbody>
@@ -60,16 +60,16 @@
   <td class="col-sm-2">
     <%= email %>
   </td>
-  <td class="col-sm-4">
+  <td class="col-sm-3">
     <% if ( lrs_owned.length > 0 ){ %>
-      <p>Lrs's owned:
+      <p>Owner of:
       <% _.each(lrs_owned, function(lrs) { %>  
         <a href="{{ URL() }}/lrs/<%= lrs._id %>"><%= lrs.title %></a>, 
       <% }); %>
       </p>
     <% } %>
     <% if ( lrs_member.length > 0 ){ %>
-    <p>Lrs's member:
+    <p>Member of:
     <% _.each(lrs_member, function(member) { %>  
       <a href="{{ URL() }}/lrs/<%= member._id %>"><%= member.title %></a>, 
     <% }); %>
@@ -86,7 +86,10 @@
   <td class="col-sm-2">
     <%= created_at %>
   </td>
-  <td class="col-sm-1">
+  <td class="col-sm-2 text-center">
+    <button class="btn btn-danger btn-xs reset" title="{{ Lang::get('site.edit') }}"><i class="icon-refresh"></i></button>
+  </td>
+  <td class="col-sm-2 text-center">
     <button class="btn btn-danger btn-xs delete" title="{{ Lang::get('site.delete') }}"><i class="icon-trash"></i></button>
   </td>
 </script>
@@ -100,7 +103,8 @@
       <th>LRSs</th>
       <th>Role</th>
       <th>Joined</th>
-      <th></th>
+      <th>Reset Password</th>
+      <th class="text-center">Delete</th>
     </tr>
   </thead>
   <tbody></tbody>
@@ -125,7 +129,7 @@
   <td>
     <%= created_at %>
   </td>
-  <td>
+  <td class="text-center">
     <button class="btn btn-danger btn-xs delete" title="{{ Lang::get('site.delete') }}"><i class="icon-remove"></i></button>
   </td>
 </script>
@@ -177,7 +181,7 @@
     </div>
     <div class="col-xs-12 col-sm-4 col-lg-4">
       <div class="bordered stats-box">
-        <span><%= statement_count %></span>
+        <span><%= statement_count.toLocaleString() %></span>
         Total Statements
       </div>
     </div>
@@ -224,9 +228,8 @@
   <div class="row">
     <div class="col-xs-12 col-sm-12">
       <div class="statement-graph clearfix">
-        <h3>Statements <span><%= statement_count %></span></h3>
-        <p class="averages">Your daily average is <span style="color:#00cc00;"> <%= statement_avg %> statements</span> with 
-        <span style="color:#b85e80"><%= actor_count %> learners</span> in total.</p>
+        <h3>Statements <span><%= statement_count.toLocaleString() %></span></h3>
+        <p class="averages">Your daily average is <span style="color:#00cc00;"> <%= statement_avg.toLocaleString() %> statements</span>.</p>
       </div>
     </div>
   </div>

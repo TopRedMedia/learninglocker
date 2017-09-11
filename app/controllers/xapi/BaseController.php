@@ -38,17 +38,12 @@ class BaseController extends APIBaseController {
    * @return mixed Result of the method.
    */
   public function selectMethod() {
-    try {
-      switch ($this->method) {
-        case 'HEAD':
-        case 'GET': return $this->get();
-        case 'PUT': return $this->update();
-        case 'POST': return $this->store();
-        case 'DELETE': return $this->destroy();
-      }
-    } catch (\Exception $ex) {
-      $code = method_exists($ex, 'getStatusCode') ? $ex->getStatusCode() : 400;
-      throw new Exceptions\Exception($ex->getMessage(), $code, $ex);
+    switch ($this->method) {
+      case 'HEAD':
+      case 'GET': return $this->get();
+      case 'PUT': return $this->update();
+      case 'POST': return $this->store();
+      case 'DELETE': return $this->destroy();
     }
   }
 
@@ -61,8 +56,14 @@ class BaseController extends APIBaseController {
    **/
   protected function checkVersion() {
     $version = \LockerRequest::header('X-Experience-API-Version');
+    $isInvalidVersion = !(
+      isset($version) && (
+        substr($version, 0, 4) === '1.0.' ||
+        $version === '1.0'
+      )
+    );
 
-    if (!isset($version) || substr($version, 0, 4) !== '1.0.') {
+    if ($isInvalidVersion) {
       throw new Exceptions\Exception('This is not an accepted version of xAPI.');
     }
   }

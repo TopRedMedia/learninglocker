@@ -5,6 +5,7 @@ use \Locker\Repository\Base\EloquentRepository as BaseRepository;
 use \Locker\XApi\Helpers as XAPIHelpers;
 use \Locker\Helpers\Helpers as Helpers;
 use \Event as Event;
+use \Client as ClientModel;
 use \Statement as StatementModel;
 
 class EloquentRepository extends BaseRepository implements Repository {
@@ -31,20 +32,18 @@ class EloquentRepository extends BaseRepository implements Repository {
   protected function validateData(array $data) {
     if (isset($data['title'])) XAPIHelpers::checkType('title', 'string', $data['title']);
     if (isset($data['description'])) XAPIHelpers::checkType('description', 'string', $data['description']);
-    if (isset($data['api'])) XAPIHelpers::checkType('api', 'array', $data['api']);
-    if (isset($data['api']['basic_key'])) XAPIHelpers::checkType('api.basic_key', 'string', $data['api']['basic_key']);
-    if (isset($data['api']['basic_secret'])) XAPIHelpers::checkType('api.basic_secret', 'string', $data['api']['basic_secret']);
-    if (isset($data['owner'])) XAPIHelpers::checkType('owner', 'array', $data['owner']);
-    if (isset($data['owner']['_id'])) XAPIHelpers::checkType('owner._id', 'string', $data['owner']['_id']);
-    if (isset($data['users'])) XAPIHelpers::checkType('users', 'array', $data['users']);
+    if (isset($data['owner_id'])) XAPIHelpers::checkType('owner_id', 'MongoId', $data['owner_id']);
 
     // Validate users.
-    foreach ($data['users'] as $key => $field) {
-      XAPIHelpers::checkType("fields.$key", 'array', $field);
-      if (isset($field['_id'])) XAPIHelpers::checkType("fields.$key._id", 'string', $field['_id']);
-      if (isset($field['email'])) XAPIHelpers::checkType("fields.$key.email", 'string', $field['email']);
-      if (isset($field['name'])) XAPIHelpers::checkType("fields.$key.name", 'string', $field['name']);
-      if (isset($field['role'])) XAPIHelpers::checkType("fields.$key.role", 'string', $field['role']);
+    if (isset($data['users'])) {
+      XAPIHelpers::checkType('users', 'array', $data['users']);
+      foreach ($data['users'] as $key => $field) {
+        XAPIHelpers::checkType("fields.$key", 'array', $field);
+        if (isset($field['_id'])) XAPIHelpers::checkType("fields.$key._id", 'MongoId', $field['_id']);
+        if (isset($field['email'])) XAPIHelpers::checkType("fields.$key.email", 'string', $field['email']);
+        if (isset($field['name'])) XAPIHelpers::checkType("fields.$key.name", 'string', $field['name']);
+        if (isset($field['role'])) XAPIHelpers::checkType("fields.$key.role", 'string', $field['role']);
+      }
     }
   }
 
@@ -57,14 +56,10 @@ class EloquentRepository extends BaseRepository implements Repository {
    */
   protected function constructStore(Model $model, array $data, array $opts) {
     // Merges and validates data with defaults.
-    $data = array_merge(array_merge($this->defaults, $data), [
-      'api' => [
-        'basic_key' => Helpers::getRandomValue(),
-        'basic_secret' => Helpers::getRandomValue()
-      ],
-      'owner' => ['_id' => $opts['user']->_id],
+    $data = array_merge($this->defaults, $data, [
+      'owner_id' => new \MongoId($opts['user']->_id),
       'users' => [[
-        '_id'   => $opts['user']->_id,
+        '_id'   => new \MongoId($opts['user']->_id),
         'email' => $opts['user']->email,
         'name'  => $opts['user']->name,
         'role'  => 'admin'
@@ -75,11 +70,8 @@ class EloquentRepository extends BaseRepository implements Repository {
     // Sets properties on model.
     $model->title = $data['title'];
     $model->description = $data['description'];
-    $model->api = $data['api'];
-    $model->owner = $data['owner'];
+    $model->owner_id = $data['owner_id'];
     $model->users = $data['users'];
-
-    Event::fire('user.create_lrs', ['user' => $opts['user']]);
 
     return $model;
   }
@@ -110,7 +102,7 @@ class EloquentRepository extends BaseRepository implements Repository {
     if ($opts['user']->role === 'super') {
       $query = $this->where($opts);
     } else {
-      $query = $this->where('users._id', $opts['user']->_id)->remember(10);
+      $query = $this->where([])->where('users._id', $opts['user']->_id)->remember(10);
     }
 
     $obj_result = $query->get()->sortBy(function (Model $model) {
@@ -131,48 +123,59 @@ class EloquentRepository extends BaseRepository implements Repository {
 
   /**
    * Destroys the model with the given ID and options.
-   * @param String $id ID to match.
+   * @param String $lrs_id ID to match.
    * @param [String => Mixed] $opts
    * @return Boolean
    */
-  public function destroy($id, array $opts) {
-    StatementModel::where('lrs._id', $id)->delete();
-    return parent::destroy($id, $opts);
+  public function destroy($lrs_id, array $opts) {
+    // Delete related documents from client and oauth_clients collections.
+    $clients = ClientModel::where('lrs_id', $lrs_id)->get();
+    foreach ($clients as $client) {
+      $client->delete();
+    }
+    
+    StatementModel::where('lrs_id', $lrs_id)->delete();
+    return parent::destroy($lrs_id, $opts);
   }
 
   public function removeUser($id, $user_id) {
-    return $this->where('_id', $id)->pull('users', ['_id' => $user_id]);
+    return $this->where([])->where('_id', $id)->pull('users', ['_id' => new \MongoId($user_id)]);
   }
 
   public function getLrsOwned($user_id) {
-    return $this->where('owner._id', $user_id)->select('title')->get()->toArray();
+    return $this->where([])->where('owner_id', $user_id)->select('title')->get()->toArray();
   }
 
   public function getLrsMember($user_id) {
-    return $this->where('users._id', $user_id)->select('title')->get()->toArray();
+    return $this->where([])->where('users._id', $user_id)->select('title')->get()->toArray();
+  }
+
+  /**
+   * Get a statement count, either for an LRS or for the entire site if no lrs_id passed
+   */
+  public function getStatementCount( $lrs_id = null ) {
+    $collection = \DB::getCollection('statements');
+
+    $query = [];
+    
+    //Limit by LRS
+    if( $lrs_id ){
+      if( !$lrs_id instanceof \MongoId ){
+        $lrs_id = new \MongoId($lrs_id);
+      }
+
+      $query['lrs_id'] = $lrs_id;
+    }
+
+    return $collection->count($query, ['hint'=>['lrs_id'=>1]]);
   }
 
   public function changeRole($id, $user_id, $role) {
     $lrs = $this->show($id, []);
     $lrs->users = array_map(function ($user) use ($user_id, $role) {
-      $user['role'] = $user['_id'] === $user_id ? $role : $user['role'];
+      $user['role'] = (string)$user['_id'] === $user_id ? $role : $user['role'];
       return $user;
     }, $lrs->users);
     return $lrs->save();
-  }
-
-  /**
-   * Checks that the secret matches.
-   * Also used to authenticate client users.
-   * @param Illuminate\Database\Eloquent\Model $client
-   * @param string $secret
-   * @return Illuminate\Database\Eloquent\Model
-   */
-  public function checkSecret($client, $secret) {
-    if ($client !== null && $client->api['basic_secret'] === $secret) {
-      return $client;
-    } else {
-      return null;
-    }
   }
 }

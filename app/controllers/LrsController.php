@@ -1,7 +1,9 @@
 <?php
 
 use \Locker\Repository\Lrs\Repository as LrsRepo;
-use \Locker\Repository\Statement\StatementRepository as StatementRepo;
+use \Locker\Repository\Statement\Repository as StatementRepo;
+use \Locker\Repository\Statement\EloquentIndexer as StatementIndexer;
+use \Locker\Repository\Statement\IndexOptions as IndexOptions;
 
 class LrsController extends BaseController {
 
@@ -66,7 +68,7 @@ class LrsController extends BaseController {
 
     //lrs input validation
     $rules['title']        = 'required';
-    $rules['description']  = '';       
+    $rules['description']  = '';
     $validator = \Validator::make($data, $rules);
     if ($validator->fails()) return \Redirect::back()->withErrors($validator);
 
@@ -103,14 +105,14 @@ class LrsController extends BaseController {
     $data = \Input::all();
 
     //lrs input validation
-    $rules['title'] = 'required';      
+    $rules['title'] = 'required';
     $validator = \Validator::make($data, $rules);
     if ($validator->fails()) {
       return \Redirect::back()->withErrors($validator);
     };
 
     $opts = ['user' => \Auth::user()];
-    $l = $this->lrs->update($lrs_id, $data);
+    $l = $this->lrs->update($lrs_id, $data, []);
 
     if ($l) {
       return \Redirect::back()->with('success', trans('lrs.updated'));
@@ -123,7 +125,7 @@ class LrsController extends BaseController {
 
   /**
    * Display the specified resource.
-   * This is a temp hack until the single page app for 
+   * This is a temp hack until the single page app for
    * analytics is ready. v1.0 stable.
    * @param String $lrs_id
    * @return View
@@ -132,8 +134,8 @@ class LrsController extends BaseController {
     $dashboard = new \app\locker\data\dashboards\LrsDashboard($lrs_id);
     return View::make('partials.lrs.dashboard', array_merge($this->getLrs($lrs_id), [
       'stats' => $dashboard->getStats(),
-      'graph_data' => $dashboard->getGraphData(),
-      'dash_nav' => true
+      'dash_nav' => true,
+      'client' => (new \Client)->where('lrs_id', $lrs_id)->first()
     ]));
   }
 
@@ -187,25 +189,20 @@ class LrsController extends BaseController {
    * @return View
    */
   public function statements($lrs_id){
-    $statements = $this->statement->index($lrs_id, [], [
-      'ascending' => false,
-      'limit' => $this->statement->count($lrs_id)
-    ])->paginate(15);
+    $site = \Site::first();
+    $statements = (new StatementIndexer)->index(new IndexOptions([
+      'lrs_id' => $lrs_id,
+      'limit' => $this->statement->count([
+        'lrs_id' => $lrs_id,
+        'scopes' => ['all']
+      ]),
+      'scopes' => ['all']
+    ]))->orderBy('stored', 'DESC')->paginate(15, ['*'], ['lrs_id'=>1], ['lrs_id'=>1, 'active'=>-1, 'voided'=>1]);
 
     return View::make('partials.statements.list', array_merge($this->getLrs($lrs_id), [
       'statements' => $statements,
-      'statement_nav' => true
-    ]));
-  }
-
-  /**
-   * Display the endpoint view.
-   * @param String $lrs_id
-   * @return View
-   */
-  public function endpoint($lrs_id) {
-    return View::make('partials.lrs.endpoint', array_merge($this->getLrs($lrs_id), [
-      'endpoint_nav' => true
+      'statement_nav' => true,
+      'lang' => $site->lang
     ]));
   }
 
@@ -221,37 +218,13 @@ class LrsController extends BaseController {
   }
 
   /**
-   * Generate a new key and secret for basic auth
-   *
-   **/
-  public function editCredentials( $lrs_id ){
-    $opts = ['user' => \Auth::user()];
-    $lrs = $this->lrs->show($lrs_id);
-
-    $lrs->api  = [
-      'basic_key' => \Locker\Helpers\Helpers::getRandomValue(),
-      'basic_secret' => \Locker\Helpers\Helpers::getRandomValue()
-    ];
-
-    if ($lrs->save()) {
-      $message_type = 'success';
-      $message = trans('update_key');
-    } else {
-      $message_type = 'error';
-      $message = trans('update_key_error');
-    }
-    
-    return Redirect::back()->with($message_type, $message);
-  }
-
-  /**
    * Display users with access to this lrs.
    * @param String $lrs_id
    * @return View
    */
   public function users($lrs_id) {
     $opts = $this->getLrs($lrs_id);
-    return View::make('partials.users.list', array_merge($opts, [ 
+    return View::make('partials.users.list', array_merge($opts, [
       'users'    => $opts['lrs']->users,
       'user_nav' => true
     ]));
@@ -260,7 +233,7 @@ class LrsController extends BaseController {
 
   public function inviteUsersForm($lrs_id) {
     $opts = $this->getLrs($lrs_id);
-    return View::make('partials.lrs.invite', array_merge($opts, [ 
+    return View::make('partials.lrs.invite', array_merge($opts, [
       'users'    => $opts['lrs']->users,
       'user_nav' => true
     ]));

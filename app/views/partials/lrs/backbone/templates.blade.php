@@ -86,15 +86,7 @@
 
 <script id="activityListView" type="text/template">
   <span class="badge badge-warning"><%= count %></span>
-  <a href="<%= _id %>">
-    <% if( name[0] && name[0] != 'undefined' ){ %>
-        <%= name[0][Object.keys(name[0])[0]] %>
-    <% }else if( description[0] && description[0] != 'undefined' ){ %>
-        <%= description[0][Object.keys(description[0])[0]] %>
-    <% }else{ %>
-        <%= _id %>
-    <% } %>
-  </a>
+  <a href="<%= _id %>"><% if( name[0] && name[0] != 'undefined' ){ %><%= name[0][Object.keys(name[0])[0]] %><% }else if( description[0] && description[0] != 'undefined' ){ %><%= description[0][Object.keys(description[0])[0]] %><% }else{ %><%= _id %><% } %></a>
 </script>
 
 <script id="userListView" type="text/template">
@@ -104,7 +96,7 @@
   <%= _id.mbox != null ? '<b>Email:</b> ' + _id.mbox : '' %>
   <%= _id.mbox_sha1sum != null ? '<b>Email:</b> ' + _id.mbox_sha1sum : '' %>
   <%= _id.openid != null ? '<b>OpenID:</b> ' + _id.openid : '' %>
-  <%= _id.account != null ? '<b>Account:</b> ' + _id.account.homePage + _id.account.name : '' %>
+  <%= _id.account != null ? '<b>Account:</b> ' + _id.account.homePage + '/' + _id.account.name : '' %>
 </script>
 
 <script id="userList" type="text/template">
@@ -143,9 +135,8 @@
 </script>
 
 <script id="dashboardHeader" type="text/template">
-  <h3>Statements <span><%= statement_count %></span></h3>
-  <p class="averages">Your daily average is <span style="color:#00cc00;"> <%= statement_avg %> statements</span> with 
-  <span style="color:#b85e80"><%= actor_count %> learners</span> in total.</p>
+  <h3>Statements <span><%= statement_count.toLocaleString() %></span></h3>
+  <p class="averages">Your daily average is <span style="color:#00cc00;"> <%= statement_avg.toLocaleString() %> statements</span>.</p>
 </script>
 
 <script id="showLoading" type="text/template">

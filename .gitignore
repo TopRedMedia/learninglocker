@@ -3,9 +3,10 @@
 composer.phar
 .DS_Store
 Thumbs.db
+.phpintel
+.env.*.php
 
 /app/config/ht2
 /app/config/production
 /app/config/staging
-
-/public/assets/js/bower_components
+/app/config/local/*.php

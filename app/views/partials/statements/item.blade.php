@@ -5,10 +5,12 @@
   $json = $statement;
   
   if( isset($statement['actor']['mbox']) ){
-    $avatar = \Locker\Helpers\Helpers::getGravatar( substr($statement['actor']['mbox'], 7), '20');
-  }else{
-    $avatar = 'http://placehold.it/20X20';
+    $avatar_id = substr($statement['actor']['mbox'], 7);
+  } else {
+    $avatar_id = 'hello@learninglocker.net';
   }
+
+  $avatar = \Locker\Helpers\Helpers::getGravatar( $avatar_id, '20');
 
   if( isset($statement['actor']['name']) && $statement['actor']['name'] != ''){
     $name = $statement['actor']['name'];
@@ -22,12 +24,16 @@
     $name = 'no name available';
   }
 
-  if( isset($statement['verb']['display']) ){
+ if( isset($statement['verb']['display']) ){
     $verb = $statement['verb']['display'];
     if (!is_array($verb)) {
       $verb = [$verb];
     }
-    $verb = reset( $verb );
+    if (isset($verb[$lang])) {
+      $verb = $verb[$lang];
+    } else {
+      $verb = reset( $verb );
+    }
   }else{
     $verb = $statement['verb']['id'];
   }
@@ -43,11 +49,11 @@
   //set object for display
 
   //is the object of type agent?
-  if( isset($statement['object']['objectType']) && $statement['object']['objectType'] == 'Agent' ){
+  if( isset($statement['object']['objectType']) && ($statement['object']['objectType'] == 'Agent' || $statement['object']['objectType'] == 'Group') ){
     if( isset($statement['object']['name']) ){
       $object = $statement['object']['name'];
     }else{
-      $object = isset($statement['object']['mbox']) ? $statement['object']['mbox'] : 'no name available';
+      $object = isset($statement['object']['mbox']) ? $statement['object']['mbox'] : $statement['object']['objectType'];
     }
   }elseif( isset($statement['object']['objectType']) && $statement['object']['objectType'] == 'SubStatement' ){
     $object = 'A SubStatement'; //@todo not sure how to handle substatement display?
@@ -67,9 +73,11 @@
         $object = [$object];
       }
       $object = reset( $object );
-    }else{
+    } elseif (isset($statement['object']['id'])) {
       //last resort, or in the case of statement ref, use the id
       $object = $statement['object']['id'];
+    } else {
+      $object = "Unnamed Object";
     }
   }
 
@@ -83,7 +91,7 @@
       <span onclick="$('.state-{{ $statement['id'] }}').toggle();"><i class="icon icon-cog lightgrey pull-left"></i></span>
 
       <span class="pull-left statement-avatar">
-          <img src="{{ $avatar }}" alt='avatar' class="img-circle" />
+          <img src="{{ $avatar }}" alt='avatar' class="img-circle avatar" />
       </span> 
         
       {{ $name }}

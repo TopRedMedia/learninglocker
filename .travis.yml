@@ -7,15 +7,19 @@ services:
   - mongodb
 
 install:
-  - npm install -g bower
-  - composer install --no-interaction --dev
+  - echo y | pecl install mongo
+  - php -r "readfile('https://getcomposer.org/installer');" | php
+  - php composer.phar install --no-interaction --dev
 
 before_script:
   - phpenv config-add travisconfig.ini
   - sleep 3
+  - sudo chmod -R 777 ./uploads
   - php artisan migrate --env="testing"
 
-script: ./vendor/bin/phpunit
+script:
+  - ./vendor/bin/phpunit
+  - sh test.sh
 
 notifications:
   slack:

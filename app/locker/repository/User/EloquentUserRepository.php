@@ -51,21 +51,16 @@ class EloquentUserRepository implements UserRepository {
 
     //first see if a record exists for that email and token
     $email = \DB::table('user_tokens')
-         ->where('token', $token)
-         ->pluck('email');
+        ->where('token', $token)
+        ->pluck('email');
 
     if( $email ){
-      //verify email
-      \User::where('email', $email)->update(array('verified' => 'yes'));
-      $message_type = 'success';
-      $message = \Lang::get('users.email_verified');
+        //verify email
+        \User::where('email', $email)->update(array('verified' => 'yes'));
+        return true;
     }else{
-      $message_type = 'error';
-      $message = \Lang::get('users.email_verified_error');
+        return false;
     }
-
-    return $message;
-
   }
 
   public function updateRole( $user, $role ){
@@ -93,7 +88,7 @@ class EloquentUserRepository implements UserRepository {
     $super   = \User::where('role', 'super')->first();
 
     //get all LRSs owned by user being deleted
-    $get_lrs = \Lrs::where('owner._id', $id)->get();
+    $get_lrs = \Lrs::where('owner_id', $id)->get();
     
     //do LRS exists?
     if( $get_lrs ){
@@ -107,7 +102,7 @@ class EloquentUserRepository implements UserRepository {
         //add merged users
         $lrs->users = $existing;
         //set owner to super admin
-        $lrs->owner = array('_id' => $super->_id);
+        $lrs->owner_id = $super->_id;
         $lrs->save();
       }
     }

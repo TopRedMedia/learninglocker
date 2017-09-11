@@ -4,8 +4,8 @@
   @parent
   <script>
     window.lrs = {
-      key: '{{ $lrs->api['basic_key']}}',
-      secret: '{{ $lrs->api['basic_secret'] }}'
+      key: '{{ $client->api['basic_key']}}',
+      secret: '{{ $client->api['basic_secret'] }}'
     };
   </script>
   <!-- load in one page application with requirejs -->
@@ -35,6 +35,5 @@
  
   <script type='text/javascript'>
     window.LL.stats = {{ json_encode( $stats ) }};
-    window.LL.graph_data = {{ json_encode( $graph_data ) }};
   </script>
 @stop

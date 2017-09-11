@@ -50,7 +50,7 @@ class EloquentRepository extends BaseRepository implements Repository {
     // Sets properties on model.
     $model->name = $data['name'];
     $model->description = $data['description'];
-    $model->lrs = $opts['lrs_id'];
+    $model->lrs_id = $opts['lrs_id'];
     $model->query = Helpers::replaceFullStop($data['query']);
     $model->since = $data['since'];
     $model->until = $data['until'];
@@ -85,9 +85,9 @@ class EloquentRepository extends BaseRepository implements Repository {
    * @param [type] $field  [description]
    * @param [type] $wheres [description]
    */
-  public function setQuery($lrs, $query, $field, $wheres) {
+  public function setQuery($lrs_id, $query, $field, $wheres) {
     return \Statement::select($field)
-      ->where('lrs._id', $lrs)
+      ->where('lrs_id', new \MongoId($lrs_id))
       ->where($wheres, 'like', '%'.$query.'%')
       ->distinct()
       ->get()
@@ -103,8 +103,8 @@ class EloquentRepository extends BaseRepository implements Repository {
   public function statements($id, array $opts) {
     $report = $this->show($id, $opts);
     return (new QueryRepository)->where(
-      $report->lrs,
+      $report->lrs_id,
       Helpers::replaceHtmlEntity($report->where)
-    )->orderBy('statement.stored', 'DESC');
+    )->orderBy('stored', 'DESC');
   }
 }

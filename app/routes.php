@@ -11,22 +11,21 @@
 |
 */
 
+App::singleton('oauth2', function() {
+    $storage = new OAuth2\Storage\Mongo(App::make('db')->getMongoDB());
+    $server = new OAuth2\Server($storage);
+    $server->addGrantType(new OAuth2\GrantType\ClientCredentials($storage));
+    return $server;
+});
+
 Route::get('/', function(){
   if( Auth::check() ){
     $site = \Site::first();
 
-    $admin_dashboard = new \app\locker\data\dashboards\AdminDashboard();
 
     //if super admin, show site dashboard, otherwise show list of LRSs can access
     if( Auth::user()->role == 'super' ){
-      $list = Lrs::all();
-      return View::make('partials.site.dashboard', array(
-        'site' => $site,
-        'list' => $list,
-        'stats' => $admin_dashboard->getFullStats(),
-        'graph_data' => $admin_dashboard->getGraphData(),
-        'dash_nav' => true
-      ));
+      return Redirect::route('site.index');
     }else{
       $lrs = Lrs::where('users._id', \Auth::user()->_id)->get();
       return View::make('partials.lrs.list', array('lrs' => $lrs, 'list' => $lrs, 'site' => $site));
@@ -123,6 +122,7 @@ Route::get('email/invite/{token}', array(
 |------------------------------------------------------------------
 */
 Route::get('site', array(
+  'as'   => 'site.index',
   'uses' => 'SiteController@index',
 ));
 Route::get('site/settings', array(
@@ -167,9 +167,6 @@ Route::put('site/users/verify/{id}', array(
 Route::get('lrs/{id}/statements', array(
   'uses' => 'LrsController@statements',
 ));
-Route::get('lrs/{id}/endpoint', array(
-  'uses' => 'LrsController@endpoint',
-));
 Route::get('lrs/{id}/users', array(
   'uses' => 'LrsController@users',
 ));
@@ -193,10 +190,6 @@ Route::get('lrs/{id}/users/invite', array(
 Route::get('lrs/{id}/api', array(
   'uses' => 'LrsController@api',
 ));
-Route::post('lrs/{id}/apikey', array(
-  'before' => 'csrf',
-  'uses'   => 'LrsController@editCredentials'
-));
 
 Route::resource('lrs', 'LrsController');
 
@@ -217,28 +210,31 @@ Route::get('lrs/{id}/exporting', array(
 |------------------------------------------------------------------
 */
 Route::get('lrs/{id}/client/manage', array(
+  'before' => 'auth',
   'uses' => 'ClientController@manage',
   'as' => 'client.manage'
 ));
 
-Route::delete('lrs/{lrs_id}/client/{id}/destory', array(
+Route::delete('lrs/{lrs_id}/client/{id}/destroy', array(
+  'before' => 'auth',
   'uses' => 'ClientController@destroy',
   'as' => 'client.destroy'
 ));
 
 Route::get('lrs/{lrs_id}/client/{id}/edit', array(
+  'before' => 'auth',
   'uses' => 'ClientController@edit',
   'as' => 'client.edit'
 ));
 
 Route::post('lrs/{id}/client/create', array(
-  'before' => 'csrf',
+  'before' => ['auth', 'csrf'],
   'uses' => 'ClientController@create',
   'as' => 'client.create'
 ));
 
 Route::put('lrs/{lrs_id}/client/{id}/update', array(
-  'before' => 'csrf',
+  'before' => ['auth', 'csrf'],
   'uses' => 'ClientController@update',
   'as' => 'client.update'
 ));
@@ -285,6 +281,10 @@ Route::put('users/{id}/add/password', array(
   'as'     => 'users.addPassword',
   'before' => 'csrf',
   'uses'   => 'PasswordController@addPassword'
+));
+Route::get('users/{id}/reset/password', array(
+  'as'     => 'users.resetpassword',
+  'uses'   => 'UserController@resetPassword'
 ));
 
 /*
@@ -386,6 +386,11 @@ Route::group( array('prefix' => 'data/xAPI', 'before'=>'auth.statement'), functi
 
 });
 
+Route::group(['prefix' => 'api/v2', 'before' => 'auth.statement'], function () {
+  Route::get('statements/insert', ['uses' => 'Controllers\API\Statements@insert']);
+  Route::get('statements/void', ['uses' => 'Controllers\API\Statements@void']);
+});
+
 /*
 |------------------------------------------------------------------
 | Learning Locker RESTful API
@@ -446,52 +451,12 @@ Route::group( array('prefix' => 'api/v1', 'before'=>'auth.statement'), function(
 | oAuth handling
 |----------------------------------------------------------------------
 */
-
-Route::resource('oauth/apps','OAuthAppController');
-
-Route::post('oauth/access_token', function(){
-    return AuthorizationServer::performAccessTokenFlow();
+Route::post('oauth/access_token', function() {
+  $bridgedRequest  = OAuth2\HttpFoundationBridge\Request::createFromRequest(Request::instance());
+  $bridgedResponse = new OAuth2\HttpFoundationBridge\Response();
+  $bridgedResponse = App::make('oauth2')->handleTokenRequest($bridgedRequest, $bridgedResponse);
+  return $bridgedResponse;
 });
-
-Route::get('oauth/authorize', array('before' => 'check-authorization-params|auth', function(){
-
-  $params = Session::get('authorize-params');
-  $params['user_id'] = Auth::user()->id;
-  $app_details = \OAuthApp::where('client_id', $params['client_id'] )->first();
-  return View::make('partials.oauth.forms.authorization-form', array('params'      => $params,
-                                                                     'app_details' => $app_details));
-
-}));
-
-Route::post('oauth/authorize', array('before' => 'check-authorization-params|auth|csrf', function(){
-
-  $params = Session::get('authorize-params');
-  $params['user_id'] = Auth::user()->id;
-
-  if (Input::get('approve') !== null) {
-    $code = AuthorizationServer::newAuthorizeRequest('user', $params['user_id'], $params);
-    Session::forget('authorize-params');
-    return Redirect::to(AuthorizationServer::makeRedirectWithCode($code, $params));
-  }
-
-  if (Input::get('deny') !== null) {
-    Session::forget('authorize-params');
-    return Redirect::to(AuthorizationServer::makeRedirectWithError($params));
-  }
-
-}));
-
-Route::get('secure-route', array('before' => 'oauth:basic', function(){
-    return "oauth secured route ";
-}));
-
-//Add OPTIONS routes for all defined xAPI and api routes
-foreach( Route::getRoutes()->getIterator() as $route  ){
-  if( $route->getPrefix() === 'data/xAPI' || $route->getPrefix() === 'api/v1' ){
-    Route::options($route->getUri(), 'Controllers\API\Base@CORSOptions');
-  }
-}
-
 
 /*
 |------------------------------------------------------------------
@@ -523,7 +488,7 @@ App::error(function(Exception $exception) {
       'success' => false,
       'message' => method_exists($exception, 'getErrors') ? $exception->getErrors() : $exception->getMessage(),
       'code' => $code,
-      'trace' => Config::get('app.debug') ? $exception->getTrace() : trans('api.info.trace')
+      'trace' => Config::get('app.debug') ? $exception->getTraceAsString() : trans('api.info.trace')
     ], $code);
   } else {
     echo "Status: ".$code." Error: ".$exception->getMessage();

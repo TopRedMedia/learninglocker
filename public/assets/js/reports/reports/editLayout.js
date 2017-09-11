@@ -18,8 +18,7 @@ define([
       if (query[field] == null) {
         query[field] = ['<>', '', ''];
       }
-
-      query[field][1 + !!min] = e.currentTarget.value;
+      query[field][1 + !!min] = parseInt(e.currentTarget.value);
     });
   };
   var clearQueryField = function (field) {
@@ -114,8 +113,7 @@ define([
     relations: {
       actors: typeaheadHelpers.view('actors', 'Actor', 'Start typing name e.g. Bob', typeaheadHelpers.displayActor),
       verbs: typeaheadHelpers.view('verbs', 'Verb', 'Start typing verb e.g. completed', function (item) {
-        var id = item.id
-        return item.display['en-GB'] + ' (' + id + ')';
+        return typeaheadHelpers.displayLangString(item.id, item.display);
       }),
       activities: typeaheadHelpers.view('activities', 'Activity URL', 'www.example.com/quiz/1'),
       activityTypes: typeaheadHelpers.view('activityTypes', 'Activity Type URL', 'www.example.com/activity-type/course', typeaheadHelpers.displayItem),

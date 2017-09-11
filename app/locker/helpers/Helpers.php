@@ -13,6 +13,8 @@ use \Locker\XApi\Errors\Error as XAPIError;
 
 class Helpers {
 
+  const MULTIPART_BOUNDARY = 'abcABC0123\'()+_,-./:=?';
+
   /*
   |----------------------------------------------------------------------------
   | scan array and replace &46; with . (This is a result of . being
@@ -89,15 +91,6 @@ class Helpers {
   }
 
   /*
-  |----------------------------------------------------------------------------
-  | Generate a random key
-  |----------------------------------------------------------------------------
-  */
-  static function getRandomValue(){
-    return sha1(uniqid(mt_rand(), true));
-  }
-
-  /*
   |---------------------------------------------------------------------------
   | Get gravatar
   |---------------------------------------------------------------------------
@@ -127,10 +120,10 @@ class Helpers {
       $defaults = include base_path() . '/.env.php';
       $value = $defaults[$var];
     }
-    
+
     return $value;
   }
-  
+
   /**
    * Determines which identifier is currently in use in the given actor.
    * @param \stdClass $actor.
@@ -154,7 +147,116 @@ class Helpers {
     if (count($errors) > 0) {
       throw new Exceptions\Validation(array_map(function (XAPIError $error) use ($trace) {
         return (string) ($trace === null ? $error : $error->addTrace($trace));
-      }, $errors)));
+      }, $errors));
     }
+  }
+
+  /**
+   * Gets the current date and time in ISO format using the current timezone.
+   * @return String Current ISO date and time.
+   */
+  static function getCurrentDate() {
+    $current_date = \DateTime::createFromFormat('U.u', sprintf('%.4f', microtime(true)));
+    $current_date->setTimezone(new \DateTimeZone(\Config::get('app.timezone')));
+    return $current_date->format('Y-m-d\TH:i:s.uP');
+  }
+
+  /**
+   * Checks the authentication.
+   * @param String $type The name of the model used to authenticate.
+   * @param String $username
+   * @param String $username
+   * @return Model
+   */
+  static function getClient($username, $password) {
+    return (new \Client)
+      ->where('api.basic_key', $username)
+      ->where('api.basic_secret', $password)
+      ->first();
+  }
+
+  /**
+   * Gets the Lrs associated with the given username and password.
+   * @param String $username
+   * @param String $password
+   * @return Lrs
+   */
+  static function getLrsFromUserPass($username, $password) {
+    $client = Helpers::getClient($username, $password);
+    $lrs = $client === null ? null : \Lrs::find($client->lrs_id);
+
+    if ($lrs === null) {
+      throw new Exceptions\Exception('Unauthorized request.', 401);
+    }
+
+    return $lrs;
+  }
+
+  /**
+   * Gets the Client/Lrs username and password from the OAuth authorization string.
+   * @param String $authorization
+   * @return [String] Formed of [Username, Password]
+   */
+  static function getUserPassFromOAuth($authorization) {
+    $token = substr($authorization, 7);
+    $db = \App::make('db')->getMongoDB();
+
+    $client_id = $db->oauth_access_tokens->find([
+      'access_token' => $token
+    ])->getNext()['client_id'];
+    $client_secret = $db->oauth_clients->find([
+      'client_id' => $client_id
+    ])->getNext()['client_secret'];
+
+    return [$client_id, $client_secret];
+  }
+
+  /**
+   * Gets the Client/Lrs username and password from the Basic Auth authorization string.
+   * @param String $authorization
+   * @return [String] Formed of [Username, Password]
+   */
+  static function getUserPassFromBAuth($authorization) {
+    $username = json_decode('"'.\LockerRequest::getUser().'"');
+    $password = json_decode('"'.\LockerRequest::getPassword().'"');
+    return [$username, $password];
+  }
+
+  /**
+   * Gets the username and password from the authorization string.
+   * @return [String] Formed of [Username, Password]
+   */
+  static function getUserPassFromAuth() {
+    $authorization = \LockerRequest::header('Authorization');
+    if ($authorization !== null && strpos($authorization, 'Basic') === 0) {
+      list($username, $password) = Helpers::getUserPassFromBAuth($authorization);
+    } else if ($authorization !== null && strpos($authorization, 'Bearer') === 0) {
+      list($username, $password) = Helpers::getUserPassFromOAuth($authorization);
+    } else {
+      throw new Exceptions\Exception('Invalid auth', 400);
+    }
+    return [$username, $password];
+  }
+
+  /**
+   * Gets the current LRS from the Authorization header.
+   * @return \Lrs
+   */
+  static function getLrsFromAuth() {
+    list($username, $password) = Helpers::getUserPassFromAuth();
+    return Helpers::getLrsFromUserPass($username, $password);
+  }
+
+  public static function convertIds( $models = [] ) {
+    return array_map( function($model){
+      $idString = \MongoId::isValid($model['_id']) ? $model['_id'] : null;
+      $model['_id'] = new \MongoId($idString);
+      return $model;
+    }, $models);
+  }
+
+  public static function mixedMultipartContentType( $boundary = null ){
+    $boundary = $boundary ?: static::MULTIPART_BOUNDARY;
+    return 'multipart/mixed; boundary="' . $boundary . '"';
   }
 }

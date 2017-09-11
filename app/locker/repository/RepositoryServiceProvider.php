@@ -11,16 +11,16 @@ class RepositoryServiceProvider extends ServiceProvider {
       'Locker\Repository\User\EloquentUserRepository'
     );
     $this->app->bind(
-      'Locker\Repository\Statement\StatementRepository',
-      'Locker\Repository\Statement\EloquentStatementRepository'
+      'Locker\Repository\Statement\Repository',
+      'Locker\Repository\Statement\EloquentRepository'
     );
     $this->app->bind(
       'Locker\Repository\Lrs\Repository',
       'Locker\Repository\Lrs\EloquentRepository'
     );
 	$this->app->bind(
-      'Locker\Repository\Client\ClientRepository',
-      'Locker\Repository\Client\EloquentClientRepository'
+      'Locker\Repository\Client\Repository',
+      'Locker\Repository\Client\EloquentRepository'
     );
     $this->app->bind(
       'Locker\Repository\Site\SiteRepository',
@@ -33,10 +33,6 @@ class RepositoryServiceProvider extends ServiceProvider {
     $this->app->bind(
       'Locker\Repository\Document\DocumentRepository',
       'Locker\Repository\Document\EloquentDocumentRepository'
-    );
-    $this->app->bind(
-      'Locker\Repository\Activity\ActivityRepository',
-      'Locker\Repository\Activity\EloquentActivityRepository'
     );
     $this->app->bind(
       'Locker\Repository\OAuthApp\OAuthAppRepository',
